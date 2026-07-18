@@ -1,0 +1,347 @@
+/* BB劇場メーカー — ダークテーマUI */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #17191f;
+  --panel: #1f232c;
+  --panel2: #272c38;
+  --border: #363c4a;
+  --text: #e6e9f0;
+  --sub: #9aa3b5;
+  --accent: #4f8ef7;
+  --accent2: #37c56f;
+  --danger: #e05555;
+}
+
+html, body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif;
+  font-size: 14px;
+  height: 100%;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+header h1 { font-size: 18px; }
+.ver { font-size: 11px; color: var(--sub); font-weight: normal; margin-left: 6px; }
+.header-btns { display: flex; gap: 8px; }
+
+main {
+  display: grid;
+  grid-template-columns: 320px 1fr 380px;
+  gap: 12px;
+  padding: 12px;
+  align-items: start;
+}
+@media (max-width: 1100px) {
+  main { grid-template-columns: 1fr; }
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+}
+
+details > summary {
+  cursor: pointer;
+  font-weight: bold;
+  padding: 4px 2px;
+  color: var(--text);
+  user-select: none;
+}
+details[open] > summary { margin-bottom: 8px; }
+
+.hint { color: var(--sub); font-size: 12px; margin-top: 8px; line-height: 1.5; }
+.hint code { background: var(--panel2); padding: 1px 5px; border-radius: 4px; }
+
+/* ---- ボタン ---- */
+.btn {
+  background: var(--panel2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 7px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: filter .15s;
+}
+.btn:hover { filter: brightness(1.25); }
+.btn.primary { background: var(--accent); border-color: var(--accent); }
+.btn.export { background: var(--accent2); border-color: var(--accent2); color: #10281a; font-weight: bold; }
+.btn.danger { background: var(--danger); border-color: var(--danger); }
+.btn.wide { width: 100%; margin-top: 8px; }
+.btn.small { padding: 4px 10px; font-size: 12px; }
+
+/* ---- キャラパネル ---- */
+.char-box {
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px;
+  margin-bottom: 10px;
+}
+.char-head { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+.char-side {
+  background: var(--accent);
+  border-radius: 5px;
+  font-size: 11px;
+  padding: 3px 7px;
+  flex-shrink: 0;
+}
+.char-name {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 8px;
+}
+.char-color { width: 34px; height: 30px; border: none; background: none; cursor: pointer; }
+.flip-label { font-size: 12px; color: var(--sub); display: flex; align-items: center; gap: 3px; white-space: nowrap; }
+
+.sprite-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+.sprite-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 5px;
+}
+.thumb {
+  width: 44px; height: 44px;
+  object-fit: contain;
+  background:
+    repeating-conic-gradient(#3a3f4d 0 25%, #2c313d 0 50%) 0 0 / 16px 16px;
+  border-radius: 5px;
+  flex-shrink: 0;
+}
+.thumb.wide { width: 74px; height: 42px; object-fit: cover; }
+.sprite-info { flex: 1; min-width: 0; }
+.sprite-tags {
+  width: 100%;
+  background: var(--panel2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 3px 7px;
+  font-size: 12px;
+}
+.sprite-label {
+  font-size: 11px;
+  color: var(--sub);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+.del {
+  background: none;
+  border: none;
+  color: var(--sub);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 2px 6px;
+  flex-shrink: 0;
+}
+.del:hover { color: var(--danger); }
+.add-sprite { display: block; text-align: center; }
+
+/* ---- 背景パネル ---- */
+.bg-slot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 8px;
+  margin-bottom: 8px;
+}
+.bg-num {
+  background: var(--accent);
+  border-radius: 50%;
+  width: 22px; height: 22px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.bg-empty { flex: 1; color: var(--sub); font-size: 12px; }
+.bg-slot .thumb.wide { flex: 1; width: auto; max-width: 130px; }
+
+/* ---- 設定 ---- */
+.settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.settings-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+  color: var(--sub);
+}
+.settings-grid input, .settings-grid select {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 7px;
+}
+
+/* ---- 中央プレビュー ---- */
+.center { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.canvas-wrap {
+  background: #000;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  line-height: 0;
+}
+#preview { width: 100%; height: auto; display: block; }
+
+.transport {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 12px;
+}
+#btnPlay { min-width: 86px; }
+#seek { flex: 1; accent-color: var(--accent); }
+#timeLabel { color: var(--sub); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.export-row { display: flex; gap: 10px; }
+.export-row .btn { flex: 1; padding: 10px; }
+
+/* ---- 台本 ---- */
+#script {
+  width: 100%;
+  height: 300px;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+  font-family: "Consolas", "Osaka-Mono", monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+/* ---- 警告 ---- */
+#warnings:empty { display: none; }
+#warnings {
+  background: #3a2f1c;
+  border: 1px solid #7a6430;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+}
+.warn-title { font-weight: bold; color: #ffd479; margin-bottom: 4px; }
+.warn-item { color: #e8d5a8; line-height: 1.5; }
+
+/* ---- タイムラインリスト ---- */
+#lineList { display: flex; flex-direction: column; gap: 4px; }
+.empty-note { color: var(--sub); font-size: 12px; padding: 8px; }
+.tl-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 5px 8px;
+  cursor: pointer;
+  transition: border-color .1s;
+}
+.tl-row:hover { border-color: var(--accent); }
+.tl-row.active { border-color: var(--accent2); background: #223328; }
+.tl-time { color: var(--sub); font-size: 11px; font-variant-numeric: tabular-nums; width: 42px; flex-shrink: 0; }
+.tl-name {
+  color: #1b1b1b;
+  font-size: 11px;
+  font-weight: bold;
+  border-radius: 5px;
+  padding: 2px 7px;
+  flex-shrink: 0;
+}
+.tl-emo {
+  font-size: 11px;
+  border-radius: 5px;
+  padding: 2px 6px;
+  flex-shrink: 0;
+}
+.tl-emo.auto { background: #2c3a55; color: #9cc0ff; }
+.tl-emo.manual { background: #46335a; color: #d9b7ff; }
+.tl-thumb { width: 26px; height: 26px; object-fit: contain; flex-shrink: 0; }
+.tl-text {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 12px;
+}
+.tl-dur { color: var(--sub); font-size: 11px; flex-shrink: 0; }
+
+/* ---- モーダル ---- */
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+.modal.hidden { display: none; }
+.modal-box {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  width: min(480px, 92vw);
+}
+.modal-box h3 { margin-bottom: 12px; }
+.modal-box p { color: var(--sub); font-size: 13px; line-height: 1.6; margin-bottom: 10px; }
+.modal-btns { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
+.text-input {
+  width: 100%;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 8px 10px;
+  font-family: monospace;
+}
+.progressbar {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  height: 18px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+#progressFill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+  transition: width .2s;
+}
+#progressText { text-align: center; color: var(--sub); font-size: 12px; }
