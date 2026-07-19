@@ -7,10 +7,11 @@
 const Exporter = (() => {
 
   const MIME_CANDIDATES = [
+    { mime: 'video/mp4;codecs="avc1.640028,mp4a.40.2"', ext: "mp4" },
     { mime: 'video/mp4;codecs="avc1.640028"', ext: "mp4" },
     { mime: "video/mp4", ext: "mp4" },
-    { mime: 'video/webm;codecs="vp9"', ext: "webm" },
-    { mime: 'video/webm;codecs="vp8"', ext: "webm" },
+    { mime: 'video/webm;codecs="vp9,opus"', ext: "webm" },
+    { mime: 'video/webm;codecs="vp8,opus"', ext: "webm" },
     { mime: "video/webm", ext: "webm" },
   ];
 
@@ -29,9 +30,10 @@ const Exporter = (() => {
    * @param {object} tl コンパイル済みタイムライン
    * @param {(ratio:number)=>void} onProgress 進捗コールバック(0..1)
    * @param {{cancelled: boolean}} token キャンセル用トークン
+   * @param {AudioLib.Engine} audioEngine BGM/SE用エンジン(音源が無ければ省略可)
    * @returns {Promise<{blob: Blob, ext: string}>}
    */
-  async function exportVideo(state, tl, onProgress, token) {
+  async function exportVideo(state, tl, onProgress, token, audioEngine) {
     const codec = pickMime();
     if (!codec) {
       throw new Error("このブラウザは動画書き出し(MediaRecorder)に対応していません。ChromeまたはEdgeをお試しください。");
@@ -44,9 +46,23 @@ const Exporter = (() => {
     Renderer.draw(ctx, state, tl, 0);
 
     const stream = canvas.captureStream(tl.fps);
+
+    // BGM/SEがあれば音声トラックを合成する
+    const hasAudio = audioEngine &&
+      ((tl.bgmSegs || []).some(s => s.bgmIndex >= 0) || (tl.seEvents || []).length > 0);
+    let audioCtx = null, audioDest = null;
+    if (hasAudio) {
+      await audioEngine.prepare(state);
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      await audioCtx.resume();
+      audioDest = audioCtx.createMediaStreamDestination();
+      for (const tr of audioDest.stream.getAudioTracks()) stream.addTrack(tr);
+    }
+
     const rec = new MediaRecorder(stream, {
       mimeType: codec.mime,
       videoBitsPerSecond: tl.width >= 1920 ? 12_000_000 : 8_000_000,
+      audioBitsPerSecond: 128_000,
     });
     const chunks = [];
     rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
@@ -58,6 +74,7 @@ const Exporter = (() => {
 
     rec.start(250);
     const t0 = performance.now();
+    if (hasAudio) audioEngine.start(0, state, tl, audioCtx, audioDest);
 
     // 実時間で描画し続ける。バックグラウンドタブでrAFが止まらないようsetIntervalを使う。
     await new Promise((resolve) => {
@@ -77,6 +94,10 @@ const Exporter = (() => {
     rec.stop();
     await done;
     stream.getTracks().forEach(tr => tr.stop());
+    if (hasAudio) {
+      audioEngine.stop();
+      audioCtx.close();
+    }
 
     if (token.cancelled) throw new Error("キャンセルされました");
     if (onProgress) onProgress(1);

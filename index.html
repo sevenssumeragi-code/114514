@@ -9,7 +9,7 @@
 <body>
 
 <header>
-  <h1>🎬 BB劇場メーカー <span class="ver">v0.1 MVP</span></h1>
+  <h1>🎬 BB劇場メーカー <span class="ver">v0.2</span></h1>
   <div class="header-btns">
     <button id="btnSample" class="btn">サンプル読込</button>
     <button id="btnSaveProj" class="btn">プロジェクト保存</button>
@@ -31,6 +31,22 @@
       <div id="bgPanel"></div>
       <p class="hint">台本の <code>@bg 2</code> で切り替え。未設定の番号は単色背景になります。</p>
     </details>
+    <details open>
+      <summary>BGM(場面に自動割当)</summary>
+      <div id="bgmPanel"></div>
+      <label class="btn add-sprite">+ BGMを追加(複数可)
+        <input type="file" id="bgmFiles" accept="audio/*" multiple hidden>
+      </label>
+      <p class="hint">ムードタグ(日常/コミカル/緊張/激しい/悲しい/感動/静か)を付けると、場面の感情に合わせて自動で切り替わります。<code>@bgm 緊張</code> / <code>@bgm なし</code> で手動指定も可能。</p>
+    </details>
+    <details open>
+      <summary>SE(セリフに自動割当)</summary>
+      <div id="sePanel"></div>
+      <label class="btn add-sprite">+ SEを追加(複数可)
+        <input type="file" id="seFiles" accept="audio/*" multiple hidden>
+      </label>
+      <p class="hint">タグ(衝撃/ツッコミ/笑い/きゅん/悲しい/汎用)を付けると、感情が動いたセリフの頭で自動再生。<code>@se 衝撃</code> で手動指定も可能。</p>
+    </details>
     <details>
       <summary>設定</summary>
       <div class="settings-grid">
@@ -48,6 +64,8 @@
         <label>最短表示(秒) <input id="setMin" type="number" min="0" step="0.1"></label>
         <label>最長表示(秒) <input id="setMax" type="number" min="1" step="0.5"></label>
         <label>セリフ間の間(秒) <input id="setGap" type="number" min="0" step="0.05"></label>
+        <label>BGM音量 <input id="setBgmVol" type="range" min="0" max="1" step="0.05"></label>
+        <label>SE音量 <input id="setSeVol" type="range" min="0" max="1" step="0.05"></label>
       </div>
     </details>
   </aside>
@@ -71,6 +89,39 @@
   <!-- 右: 台本とタイムライン -->
   <aside class="panel side">
     <details open>
+      <summary>シナリオ自動生成</summary>
+      <div class="gen-grid">
+        <input id="genPrompt" class="text-input" placeholder="テーマを入力(例: 呪いの壺、限界ラーメン店 …)">
+        <div class="gen-row">
+          <select id="genTaste"></select>
+          <select id="genLength"></select>
+        </div>
+        <button id="btnGenLocal" class="btn primary wide">🎲 内蔵エンジンで生成(オフライン)</button>
+        <details class="sub">
+          <summary>🤖 AI生成(Claude API)</summary>
+          <input id="apiKey" class="text-input" type="password" placeholder="APIキー(sk-ant-…)※この端末にのみ保存">
+          <select id="apiModel" class="wide-sel"></select>
+          <button id="btnGenAPI" class="btn wide">Claudeでシナリオ生成</button>
+          <p class="hint">自分のAnthropic APIキーで生成します(キーはlocalStorageにのみ保存)。ネットワーク制限のある環境では内蔵エンジンをご利用ください。</p>
+        </details>
+      </div>
+    </details>
+    <details>
+      <summary>動画から真似る(テンポ模倣)</summary>
+      <div class="gen-grid">
+        <label class="btn wide">📼 動画ファイルを選択
+          <input type="file" id="videoFile" accept="video/*" hidden>
+        </label>
+        <button id="btnAnalyze" class="btn wide" disabled>解析する</button>
+        <pre id="profileSummary" class="profile-box hidden"></pre>
+        <label class="check-label hidden" id="useProfileWrap">
+          <input type="checkbox" id="useProfile" checked>
+          生成時にこの動画のテンポ(場面数・セリフ長・間・話者交代)を真似る
+        </label>
+        <p class="hint">既存のBB劇場動画を読み込むと、カット割り・字幕の切替(会話テンポ)・BGMの変化・左右キャラの動きを解析し、シナリオ生成時にそのリズムを移植します。</p>
+      </div>
+    </details>
+    <details open>
       <summary>台本</summary>
       <textarea id="script" spellcheck="false" placeholder='名前「セリフ」 の形式で入力
 @bg 2 で背景切替 / @wait 1.5 で間
@@ -90,6 +141,14 @@
   <option value="通常"><option value="笑顔"><option value="怒り"><option value="悲しみ">
   <option value="驚き"><option value="照れ"><option value="疑問"><option value="叫び">
 </datalist>
+<datalist id="moodOptions">
+  <option value="日常"><option value="コミカル"><option value="緊張"><option value="激しい">
+  <option value="悲しい"><option value="感動"><option value="静か">
+</datalist>
+<datalist id="seTagOptions">
+  <option value="衝撃"><option value="ツッコミ"><option value="笑い"><option value="きゅん">
+  <option value="悲しい"><option value="汎用">
+</datalist>
 
 <!-- モーダル -->
 <div id="modal" class="modal hidden">
@@ -101,6 +160,7 @@
 </div>
 
 <script src="js/emotion.js"></script>
+<script src="js/audio.js"></script>
 <script src="js/parser.js"></script>
 <script src="js/timeline.js"></script>
 <script src="js/renderer.js"></script>
@@ -108,6 +168,8 @@
 <script src="js/exporter.js"></script>
 <script src="js/zip.js"></script>
 <script src="js/exo.js"></script>
+<script src="js/scenario.js"></script>
+<script src="js/analyzer.js"></script>
 <script src="js/samples.js"></script>
 <script src="js/app.js"></script>
 </body>

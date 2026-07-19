@@ -30,11 +30,21 @@ const Timeline = (() => {
 
     const bgSegs = [];
     const lines = [];
+    const bgmForces = [];
+    const manualSes = [];
     let t = 0;
     let curBg = { start: 0, bgIndex: 0 };
 
     for (const ev of events) {
-      if (ev.kind === "bg") {
+      if (ev.kind === "bgm") {
+        if (ev.tag && !AudioLib.MOODS.includes(ev.tag)) {
+          warnings.push(`${ev.lineNo}行目: BGMタグは ${AudioLib.MOODS.join("/")} または「なし」で指定してください`);
+        } else {
+          bgmForces.push({ t, tag: ev.tag, off: !!ev.off });
+        }
+      } else if (ev.kind === "se") {
+        manualSes.push({ t, tag: ev.tag, lineNo: ev.lineNo });
+      } else if (ev.kind === "bg") {
         if (ev.index !== curBg.bgIndex) {
           if (t > curBg.start) bgSegs.push({ ...curBg, end: t });
           curBg = { start: t, bgIndex: ev.index };
@@ -76,11 +86,24 @@ const Timeline = (() => {
 
     const charLines = state.chars.map((_, ci) => lines.filter(l => l.charIndex === ci));
 
-    return {
+    const tl = {
       duration,
       fps: s.fps, width: s.width, height: s.height,
       bgSegs, lines, charLines, warnings,
+      bgmSegs: [], seEvents: [],
     };
+
+    // BGM/SEの自動割当(音源が登録されていれば)
+    const { bgmSegs, seEvents } = AudioLib.assign(state, tl, { bgmForces, manualSes });
+    tl.bgmSegs = bgmSegs;
+    tl.seEvents = seEvents;
+    for (const m of manualSes) {
+      if (!seEvents.some(ev => !ev.auto && ev.t === m.t && ev.tag === m.tag)) {
+        warnings.push(`${m.lineNo}行目: タグ「${m.tag}」に合うSEが登録されていません`);
+      }
+    }
+
+    return tl;
   }
 
   /** 時刻tの背景セグメント(クロスフェード用に直前のものも返す) */

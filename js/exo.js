@@ -28,6 +28,14 @@ const Exo = (() => {
     "輝度反転": "8b50937894bd935d",
     "色相反転": "9046918a94bd935d",
     "透明度反転": "93a796be937894bd935d",
+    "音声ファイル": "89b990ba837483408343838b",
+    "再生位置": "8dc490b688ca9275",
+    "再生速度": "8dc490b691ac9378",
+    "ループ再生": "838b815b83768dc490b6",
+    "動画ファイルと連携": "93ae89e6837483408343838b82c698418c67",
+    "標準再生": "95578f808dc490b6",
+    "音量": "89b997ca",
+    "左右": "8db68945",
   };
 
   function hexToBytes(hex) {
@@ -89,12 +97,26 @@ const Exo = (() => {
     return t === "jpeg" ? "jpg" : t;
   }
 
+  const AUDIO_EXT = {
+    "audio/wav": "wav", "audio/x-wav": "wav", "audio/wave": "wav",
+    "audio/mpeg": "mp3", "audio/mp3": "mp3",
+    "audio/mp4": "m4a", "audio/x-m4a": "m4a", "audio/aac": "aac",
+    "audio/ogg": "ogg", "audio/webm": "weba", "audio/flac": "flac",
+  };
+
+  function audioExtOf(dataURL) {
+    const m = /^data:([^;]+)/.exec(dataURL || "");
+    return AUDIO_EXT[m ? m[1].toLowerCase() : ""] || "wav";
+  }
+
   /** 書き出す素材ファイル名の割当計画を立てる */
   function planAssets(state) {
     const bg = state.bgs.map((b, i) => (b && b.dataURL) ? `bg${i + 1}.${extOf(b.dataURL)}` : null);
     const sprites = state.chars.map((c, ci) =>
       c.sprites.map((sp, si) => `char${ci + 1}_${String(si + 1).padStart(2, "0")}.${extOf(sp.dataURL)}`));
-    return { bg, sprites };
+    const bgms = (state.bgms || []).map((b, i) => `bgm${String(i + 1).padStart(2, "0")}.${audioExtOf(b.dataURL)}`);
+    const ses = (state.ses || []).map((s, i) => `se${String(i + 1).padStart(2, "0")}.${audioExtOf(s.dataURL)}`);
+    return { bg, sprites, bgms, ses };
   }
 
   /** 秒区間の配列 → フレーム区間(1始まり・隙間なし)に変換 */
@@ -132,13 +154,30 @@ const Exo = (() => {
     b.line("audio_rate=44100");
     b.line("audio_ch=2");
 
-    const objHeader = (fStart, fEnd, layer) => {
+    const objHeader = (fStart, fEnd, layer, isAudio) => {
       b.line(`[${objIndex}]`);
       b.line(`start=${fStart}`);
       b.line(`end=${fEnd}`);
       b.line(`layer=${layer}`);
       b.line("overlay=1");
+      if (isAudio) b.line("audio=1");
       b.line("camera=0");
+    };
+
+    const audioObj = (fStart, fEnd, layer, file, loop, volumePct) => {
+      objHeader(fStart, fEnd, layer, true);
+      b.line(`[${objIndex}.0]`);
+      b.line("_name=", { j: "音声ファイル" });
+      b.line({ j: "再生位置" }, "=0.00");
+      b.line({ j: "再生速度" }, "=100.0");
+      b.line({ j: "ループ再生" }, `=${loop ? 1 : 0}`);
+      b.line({ j: "動画ファイルと連携" }, "=0");
+      b.line(`file=${dir}\\${file}`);
+      b.line(`[${objIndex}.1]`);
+      b.line("_name=", { j: "標準再生" });
+      b.line({ j: "音量" }, `=${volumePct.toFixed(1)}`);
+      b.line({ j: "左右" }, "=0.0");
+      objIndex++;
     };
 
     const stdDraw = (sub, X, Y, zoom) => {
@@ -213,8 +252,29 @@ const Exo = (() => {
       }
     }
 
-    // ---- レイヤー4: 字幕テキスト ----
+    // ---- レイヤー5: BGM / レイヤー6: SE ----
     const f = (t) => Math.round(t * fps);
+    const bgmVolPct = (state.settings.bgmVolume ?? 0.5) * 100;
+    const seVolPct = (state.settings.seVolume ?? 0.7) * 100;
+    for (const seg of (tl.bgmSegs || [])) {
+      if (seg.bgmIndex < 0) continue;
+      const file = plan.bgms[seg.bgmIndex];
+      if (!file) continue;
+      const fStart = Math.max(1, f(seg.start) + 1);
+      const fEnd = Math.max(fStart, Math.min(totalFrames, f(seg.end)));
+      audioObj(fStart, fEnd, 5, file, true, bgmVolPct);
+    }
+    for (const ev of (tl.seEvents || [])) {
+      const file = plan.ses[ev.seIndex];
+      if (!file) continue;
+      const asset = state.ses[ev.seIndex];
+      const durSec = (asset && asset.buffer) ? asset.buffer.duration : 2.0;
+      const fStart = Math.max(1, f(ev.t) + 1);
+      const fEnd = Math.max(fStart, Math.min(totalFrames, fStart + f(durSec)));
+      audioObj(fStart, fEnd, 6, file, false, seVolPct);
+    }
+
+    // ---- レイヤー4: 字幕テキスト ----
     for (const line of tl.lines) {
       const char = state.chars[line.charIndex];
       const fStart = Math.max(1, f(line.start) + 1);

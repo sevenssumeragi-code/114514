@@ -249,8 +249,190 @@ const Samples = (() => {
 
   const EMOTION_SET = ["通常", "笑顔", "怒り", "悲しみ", "驚き", "照れ"];
 
+  // ---------- サンプル音源(チップチューン風に合成) ----------
+
+  const SR = 22050;
+
+  function makeOfflineCtx(dur) {
+    const C = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    return new C(1, Math.ceil(dur * SR), SR);
+  }
+
+  function tone(ctx, { f, f2, t0, d, type = "square", g = 0.15 }) {
+    const osc = ctx.createOscillator();
+    osc.type = type;
+    osc.frequency.setValueAtTime(f, t0);
+    if (f2) osc.frequency.linearRampToValueAtTime(f2, t0 + d);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0, t0);
+    gain.gain.linearRampToValueAtTime(g, t0 + 0.01);
+    gain.gain.setValueAtTime(g, Math.max(t0 + 0.01, t0 + d - 0.04));
+    gain.gain.linearRampToValueAtTime(0, t0 + d);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(t0);
+    osc.stop(t0 + d + 0.02);
+  }
+
+  function noise(ctx, { t0, d, g = 0.2, freq = 3000, type = "highpass" }) {
+    const len = Math.ceil(d * SR);
+    const buf = ctx.createBuffer(1, len, SR);
+    const ch = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) ch[i] = Math.random() * 2 - 1;
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const filter = ctx.createBiquadFilter();
+    filter.type = type;
+    filter.frequency.value = freq;
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(g, t0);
+    gain.gain.linearRampToValueAtTime(0, t0 + d);
+    src.connect(filter).connect(gain).connect(ctx.destination);
+    src.start(t0);
+  }
+
+  // 音名→周波数(A4=440)
+  const NOTE = (() => {
+    const names = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+    const table = {};
+    for (const [n, semis] of Object.entries(names)) {
+      for (let oct = 1; oct <= 6; oct++) {
+        table[n + oct] = 440 * Math.pow(2, (semis + (oct - 4) * 12 - 9) / 12);
+        table[n + "#" + oct] = 440 * Math.pow(2, (semis + 1 + (oct - 4) * 12 - 9) / 12);
+      }
+    }
+    return table;
+  })();
+
+  function seq(ctx, notes, { beat, type = "square", g = 0.12, staccato = 0.85 }) {
+    notes.forEach((n, i) => {
+      if (!n) return; // 休符
+      tone(ctx, { f: NOTE[n], t0: i * beat, d: beat * staccato, type, g });
+    });
+  }
+
+  async function renderWav(dur, fn) {
+    const ctx = makeOfflineCtx(dur);
+    fn(ctx);
+    const buf = await ctx.startRendering();
+    return AudioLib.bufferToWavDataURL(buf);
+  }
+
+  async function buildAudio() {
+    const bgms = [];
+    const ses = [];
+
+    // BGM: 日常(ほのぼのループ)
+    bgms.push({
+      label: "サンプルBGM(日常)", tags: ["日常"],
+      dataURL: await renderWav(6.4, (ctx) => {
+        const beat = 0.2;
+        const mel = ["C5", "E5", "G5", "E5", "A4", "C5", "E5", "C5", "F4", "A4", "C5", "A4", "G4", "B4", "D5", "B4"];
+        seq(ctx, [...mel, ...mel], { beat, type: "square", g: 0.09 });
+        const bass = ["C3", null, "G3", null, "A2", null, "E3", null, "F3", null, "C3", null, "G3", null, "G3", null];
+        seq(ctx, [...bass, ...bass], { beat, type: "triangle", g: 0.2 });
+      }),
+    });
+
+    // BGM: コミカル(スタッカートの跳ね)
+    bgms.push({
+      label: "サンプルBGM(コミカル)", tags: ["コミカル"],
+      dataURL: await renderWav(4.8, (ctx) => {
+        const beat = 0.15;
+        const mel = ["C5", null, "C5", "D5", "E5", null, "G5", null, "E5", null, "C5", null, "D5", "D5", null, null,
+                     "E5", null, "E5", "F5", "G5", null, "C6", null, "G5", "E5", "C5", null, "G4", null, null, null];
+        seq(ctx, mel, { beat, type: "square", g: 0.1, staccato: 0.5 });
+        const bass = ["C2", "C3", "E2", "E3", "F2", "F3", "G2", "G3"];
+        seq(ctx, [...bass, ...bass, ...bass, ...bass], { beat: beat * 2, type: "triangle", g: 0.22, staccato: 0.5 });
+      }),
+    });
+
+    // BGM: 緊張(低音ドローン+不協和音)
+    bgms.push({
+      label: "サンプルBGM(緊張)", tags: ["緊張"],
+      dataURL: await renderWav(8.0, (ctx) => {
+        tone(ctx, { f: NOTE["A2"], t0: 0, d: 8.0, type: "sawtooth", g: 0.08 });
+        tone(ctx, { f: NOTE["A2"] * 1.02, t0: 0, d: 8.0, type: "sawtooth", g: 0.06 });
+        for (let i = 0; i < 4; i++) {
+          tone(ctx, { f: NOTE["A#4"], t0: i * 2 + 1.0, d: 0.35, type: "square", g: 0.06 });
+          tone(ctx, { f: NOTE["A4"], t0: i * 2 + 1.15, d: 0.35, type: "square", g: 0.06 });
+        }
+      }),
+    });
+
+    // BGM: 激しい(疾走ベース+ハット)
+    bgms.push({
+      label: "サンプルBGM(激しい)", tags: ["激しい"],
+      dataURL: await renderWav(4.8, (ctx) => {
+        const beat = 0.15;
+        const bass = ["E2", "E2", "E3", "E2", "G2", "G2", "G3", "G2", "A2", "A2", "A3", "A2", "B2", "B2", "D3", "B2"];
+        seq(ctx, [...bass, ...bass], { beat, type: "sawtooth", g: 0.2, staccato: 0.7 });
+        for (let i = 0; i < 32; i++) {
+          noise(ctx, { t0: i * beat, d: 0.03, g: i % 4 === 0 ? 0.15 : 0.06, freq: 6000 });
+        }
+      }),
+    });
+
+    // BGM: 悲しい(短調の静かなアルペジオ)
+    bgms.push({
+      label: "サンプルBGM(悲しい)", tags: ["悲しい", "静か"],
+      dataURL: await renderWav(9.6, (ctx) => {
+        const beat = 0.4;
+        const arp = ["A3", "C4", "E4", "A4", "E4", "C4", "G3", "B3", "D4", "G4", "D4", "B3",
+                     "F3", "A3", "C4", "F4", "C4", "A3", "E3", "G#3", "B3", "E4", "B3", "G#3"];
+        seq(ctx, arp, { beat, type: "sine", g: 0.18, staccato: 1.0 });
+      }),
+    });
+
+    // SE: 衝撃(ドーン)
+    ses.push({
+      label: "サンプルSE(ドーン)", tags: ["衝撃"],
+      dataURL: await renderWav(0.9, (ctx) => {
+        tone(ctx, { f: 130, f2: 35, t0: 0, d: 0.8, type: "sine", g: 0.6 });
+        noise(ctx, { t0: 0, d: 0.35, g: 0.35, freq: 400, type: "lowpass" });
+      }),
+    });
+
+    // SE: ツッコミ(スパーン)
+    ses.push({
+      label: "サンプルSE(スパーン)", tags: ["ツッコミ"],
+      dataURL: await renderWav(0.35, (ctx) => {
+        noise(ctx, { t0: 0, d: 0.25, g: 0.45, freq: 1800, type: "highpass" });
+        tone(ctx, { f: 900, f2: 500, t0: 0, d: 0.12, type: "square", g: 0.15 });
+      }),
+    });
+
+    // SE: きゅん
+    ses.push({
+      label: "サンプルSE(きゅん)", tags: ["きゅん"],
+      dataURL: await renderWav(0.6, (ctx) => {
+        tone(ctx, { f: NOTE["E5"], t0: 0, d: 0.18, type: "sine", g: 0.3 });
+        tone(ctx, { f: NOTE["A5"], t0: 0.14, d: 0.4, type: "sine", g: 0.3 });
+        tone(ctx, { f: NOTE["C#6"], t0: 0.14, d: 0.4, type: "sine", g: 0.15 });
+      }),
+    });
+
+    // SE: ズコー(ずっこけ)
+    ses.push({
+      label: "サンプルSE(ズコー)", tags: ["悲しい"],
+      dataURL: await renderWav(0.8, (ctx) => {
+        tone(ctx, { f: 500, f2: 90, t0: 0, d: 0.55, type: "square", g: 0.25 });
+        noise(ctx, { t0: 0.5, d: 0.25, g: 0.2, freq: 800, type: "lowpass" });
+      }),
+    });
+
+    // SE: ピコッ(汎用)
+    ses.push({
+      label: "サンプルSE(ピコッ)", tags: ["汎用", "笑い"],
+      dataURL: await renderWav(0.25, (ctx) => {
+        tone(ctx, { f: 880, f2: 1560, t0: 0, d: 0.16, type: "square", g: 0.25 });
+      }),
+    });
+
+    return { bgms, ses };
+  }
+
   /** サンプルプロジェクト一式(dataURLベース)を生成する */
-  function build() {
+  async function build() {
     const schemes = [
       { body: "#f5e2c0", hair: "#4a76c8", line: "#5a4630" },  // 先輩(青)
       { body: "#f9e9d2", hair: "#d8703c", line: "#5a4630" },  // 後輩(橙)
@@ -266,7 +448,8 @@ const Samples = (() => {
       })),
     }));
     const bgs = [0, 1, 2].map(k => ({ dataURL: makeBg(k) }));
-    return { chars, bgs, script: SAMPLE_SCRIPT };
+    const { bgms, ses } = await buildAudio();
+    return { chars, bgs, bgms, ses, script: SAMPLE_SCRIPT };
   }
 
   return { build };

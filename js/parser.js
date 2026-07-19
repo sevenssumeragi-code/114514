@@ -6,6 +6,8 @@
  *   # コメント                 … 無視される
  *   @bg 2                      … 背景を2番に切り替え
  *   @wait 1.5                  … 1.5秒の間(ま)を入れる
+ *   @bgm 緊張 / @bgm なし      … ここからのBGMムードを手動指定(なし=無音)
+ *   @se 衝撃                   … この位置でSEを鳴らす
  *   名前「セリフ」              … セリフ(かぎ括弧形式)
  *   名前: セリフ               … セリフ(コロン形式、全角コロンも可)
  *   セリフ末尾の (表情:怒り 時間:2.5) で表情と表示時間を手動指定できる
@@ -61,6 +63,25 @@ const Parser = (() => {
       m = line.match(/^@wait\s+([\d.]+)\s*$/i);
       if (m) {
         events.push({ kind: "wait", sec: parseFloat(m[1]), lineNo });
+        return;
+      }
+
+      // @bgm タグ / @bgm なし
+      m = line.match(/^@bgm\s+(\S+)\s*$/i);
+      if (m) {
+        const tag = m[1];
+        if (/^(なし|オフ|off|none)$/i.test(tag)) {
+          events.push({ kind: "bgm", off: true, lineNo });
+        } else {
+          events.push({ kind: "bgm", tag, lineNo });
+        }
+        return;
+      }
+
+      // @se タグ
+      m = line.match(/^@se\s+(\S+)\s*$/i);
+      if (m) {
+        events.push({ kind: "se", tag: m[1], lineNo });
         return;
       }
 
